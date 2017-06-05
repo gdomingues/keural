@@ -6,7 +6,6 @@ import org.junit.Test
 
 /**
  * @author Germanno Domingues - germanno.domingues@gmail.com
- * *
  * @since 1/30/17 3:10 AM
  */
 class KeuralManagerTest {
