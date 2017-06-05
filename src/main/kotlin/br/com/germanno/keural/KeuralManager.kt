@@ -1,5 +1,7 @@
 package br.com.germanno.keural
 
+import br.com.germanno.keural.activation_functions.ActivationFunction
+import br.com.germanno.keural.activation_functions.LogisticSigmoid
 import com.squareup.moshi.Moshi
 
 /**
@@ -10,6 +12,7 @@ abstract class KeuralManager<TInput, TOutput>(
         inputSize: Int,
         outputSize: Int,
         hiddenLayersConfiguration: IntArray = intArrayOf(10),
+        activationFunction: ActivationFunction = LogisticSigmoid(),
         learningRate: Double = 0.2,
         debugMode: Boolean = false,
         neuralNetwork: NeuralNetwork? = null
@@ -22,7 +25,7 @@ abstract class KeuralManager<TInput, TOutput>(
     protected abstract val outputToDoubleArray: (TOutput) -> DoubleArray
 
     private val network: NeuralNetwork =
-            neuralNetwork ?: NeuralNetwork(inputSize, learningRate, debugMode).apply {
+            neuralNetwork ?: NeuralNetwork(inputSize, activationFunction, learningRate, debugMode).apply {
                 hiddenLayersConfiguration.forEach { addLayer(it) }
                 addLayer(outputSize)
             }
@@ -34,7 +37,7 @@ abstract class KeuralManager<TInput, TOutput>(
 
     fun recognize(input: TInput): TOutput {
         val output = network.evaluate(inputToDoubleArray(input))
-        return doubleArrayToOutput(output.drop(1).toDoubleArray())
+        return doubleArrayToOutput(output)
     }
 
     fun networkAsJson(): String =
