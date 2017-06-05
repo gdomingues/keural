@@ -1,5 +1,6 @@
 package br.com.germanno.keural
 
+import br.com.germanno.keural.activation_functions.ActivationFunction
 import com.squareup.moshi.Json
 import java.lang.IllegalArgumentException
 import java.util.*
@@ -8,7 +9,10 @@ import java.util.*
  * @author Germanno Domingues - germanno.domingues@gmail.com
  * @since 1/28/17 10:40 PM
  */
-class Neuron(numberOfInputs: Int) {
+class Neuron(
+        numberOfInputs: Int,
+        private val activationFunction: ActivationFunction
+) {
 
     @Json(name = "input")
     var input: DoubleArray = DoubleArray(0)
@@ -28,7 +32,7 @@ class Neuron(numberOfInputs: Int) {
         val rand = Random()
 
         synapses = DoubleArray(numberOfInputs + 1).map {
-            rand.nextDouble() - 0.5
+            rand.nextDouble() * 0.1
         }.toDoubleArray()
     }
 
@@ -39,11 +43,13 @@ class Neuron(numberOfInputs: Int) {
 
         this.input = input.clone()
 
-        val vk = (0 until input.size).sumByDouble { input[it] * synapses[it] }
+        val vk = input.foldIndexed(0.0) { index, sum, value ->
+            sum + value * synapses[index]
+        }
 
-        output = 1.7159 * Math.tanh(2 * vk / 3)
+        output = activationFunction.calculateOutput(vk)
     }
 
-    fun firstDerivative() = 1.14393 * 1 / Math.pow(Math.cosh(2 * output / 3), 2.0)
+    fun firstDerivative() = activationFunction.firstDerivative(this)
 
 }
