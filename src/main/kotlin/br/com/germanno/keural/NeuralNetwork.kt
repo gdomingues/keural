@@ -1,5 +1,6 @@
 package br.com.germanno.keural
 
+import br.com.germanno.keural.activation_functions.ActivationFunction
 import com.squareup.moshi.Json
 
 /**
@@ -8,6 +9,7 @@ import com.squareup.moshi.Json
  */
 class NeuralNetwork(
         inputSize: Int,
+        @Json(name = "activationFunction") private val activationFunction: ActivationFunction,
         @Json(name = "learningRate") private val learningRate: Double,
         @Json(name = "debugMode") private val debugMode: Boolean = false
 ) {
@@ -23,39 +25,30 @@ class NeuralNetwork(
         val numberOfSynapses = if (layers.size == 0) inputLayer.size else layers.last().size
 
         (0 until numberOfNeurons).forEach {
-            layer.add(Neuron(numberOfSynapses))
+            layer.add(Neuron(numberOfSynapses, activationFunction))
         }
 
         layers.add(layer)
     }
 
     fun evaluate(input: DoubleArray): DoubleArray {
-        input.forEachIndexed { i, inputValue -> inputLayer[i] = inputValue }
+        val bias = listOf(1.0)
+        var output = input.map { it }
 
-        var signals = DoubleArray(inputLayer.size + 1)
-        signals[0] = 1.0
-
-        input.forEachIndexed { i, inputValue ->
-            signals[i + 1] = inputValue
-        }
-
-        layers.forEach { layer ->
-            layer.forEach { it.evaluate(signals) }
-
-            signals = DoubleArray(layer.size + 1)
-            signals[0] = 1.0
-
-            layer.forEachIndexed { i, neuron ->
-                signals[i + 1] = neuron.output
+        layers.forEach { neurons ->
+            neurons.forEach {
+                it.evaluate((bias + output).toDoubleArray())
             }
+
+            output = neurons.map { it.output }
         }
 
-        return signals
+        return output.toDoubleArray()
     }
 
     fun trainNetwork(inputs: Array<DoubleArray>, outputs: Array<DoubleArray>, epochs: Int) {
         (0 until epochs).forEach {
-            val isNow = debugMode && it.rem(500) == 0
+            val isNow = debugMode && it % 500 == 0
             var error = 0.0
 
             inputs.forEachIndexed { i, input ->
@@ -64,7 +57,7 @@ class NeuralNetwork(
                 if (isNow) {
                     val res = evaluate(input)
                     outputs[i].forEachIndexed { j, _ ->
-                        error += outputs[i][j] - res[j + 1]
+                        error += outputs[i][j] - res[j]
                     }
                 }
             }
@@ -77,26 +70,28 @@ class NeuralNetwork(
 
     private fun updateSynapses(input: DoubleArray, output: DoubleArray) {
         val obtained = evaluate(input)
+        var nextLayer = layers.last()
 
-        layers.last().forEachIndexed { i, _ ->
-            val error = output[i] - obtained[i + 1]
-            with(layers.last()[i]) {
-                sigma = firstDerivative() * error
+        with(nextLayer) {
+            forEachIndexed { index, neuron ->
+                val error = output[index] - obtained[index]
+                neuron.sigma = neuron.firstDerivative() * error
             }
         }
 
-        for (i in layers.size - 2 downTo 0) {
-            val layer = layers[i]
-            for (j in 0 until layer.size) {
-                val neuron = layer[j]
-                val nextLayer = layers[i + 1]
-                val s = (0 until nextLayer.size).sumByDouble {
-                    nextLayer[it].sigma * nextLayer[it].synapses[j + 1]
+        layers.dropLast(1)
+                .asReversed()
+                .forEach { layer ->
+                    layer.forEachIndexed { index, neuron ->
+                        val proportionalError =
+                                (0 until nextLayer.size).sumByDouble {
+                                    nextLayer[it].sigma * nextLayer[it].synapses[index + 1]
+                                }
+
+                        neuron.sigma = neuron.firstDerivative() * proportionalError
+                    }
+                    nextLayer = layer
                 }
-
-                neuron.sigma = neuron.firstDerivative() * s
-            }
-        }
 
         layers.forEach { layer ->
             layer.forEach { neuron ->
